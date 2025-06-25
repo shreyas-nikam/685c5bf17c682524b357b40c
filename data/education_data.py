@@ -2,29 +2,27 @@
 # data/education_data.py
 
 EDUCATION_LEVEL_FACTORS = {
+    "No Degree": 1.20,
+    "High School": 1.15,
+    "Associate's Degree": 1.10,
+    "Bachelor's Degree": 1.00,
+    "Master's Degree": 0.90,
     "PhD": 0.85,
-    "Master's": 0.90,
-    "Bachelor's": 1.00,
-    "Associate's": 1.10,
-    "High School": 1.20,
 }
 
 EDUCATION_FIELD_FACTORS = {
-    "Tech/Engineering/Quantitative Science": 0.90,
-    "Business/Finance": 1.00,
-    "Healthcare/Medicine": 0.95,
-    "Social Sciences/Humanities": 1.10,
-    "Arts/Design": 1.15,
-    "Education": 1.05,
-    "Law": 1.05,
-    "Trades/Vocational": 1.10,
-    "Other": 1.00,
+    "STEM (Science, Tech, Engineering, Math)": 0.90,
+    "Business/Finance": 0.95,
+    "Healthcare": 0.88,
+    "Arts/Humanities": 1.10,
+    "Social Sciences": 1.05,
+    "Law": 1.00,
+    "Education": 0.98,
 }
 
 SCHOOL_TIER_FACTORS = {
-    "Tier 1 (Top 100 Global)": 0.90,
-    "Tier 2 (Top 500 Global)": 0.95,
-    "Tier 3 (Reputable National)": 1.00,
-    "Tier 4 (Regional/Local)": 1.05,
-    "Tier 5 (Online/Other)": 1.10,
+    "Tier 1 (Top University)": 0.90,
+    "Tier 2 (Reputable University)": 0.95,
+    "Tier 3 (Standard University/College)": 1.00,
+    "Tier 4 (Vocational/Other)": 1.05,
 }
