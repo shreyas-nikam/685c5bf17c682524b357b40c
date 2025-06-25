@@ -3,16 +3,16 @@
 
 ECONOMIC_CLIMATE_SCENARIOS = {
     "Neutral": 1.0,
-    "Recession (Mild)": 1.1, # Higher risk in recession
-    "Recession (Severe)": 1.2, # Even higher risk
-    "Economic Boom (Mild)": 0.9, # Lower risk in boom
-    "Economic Boom (Strong)": 0.8, # Even lower risk
+    "Recession (Low Investment)": 0.9,
+    "Boom (High Investment)": 1.1,
+    "Stagnation": 0.95,
+    "Recovery": 1.05,
 }
 
 AI_INNOVATION_SCENARIOS = {
     "Neutral": 1.0,
-    "Rapid Breakthroughs": 1.2, # Higher risk with rapid innovation
-    "Slowdown in Innovation": 0.9, # Lower risk with slowdown
-    "AI Winter": 0.8, # Even lower risk if AI development stagnates
-    "Accelerated Adoption": 1.1, # Moderate increase if adoption is fast
+    "Rapid Breakthroughs": 1.2,
+    "Slowdown in Innovation": 0.8,
+    "Emerging Adoption": 1.1,
+    "Widespread Integration": 1.15,
 }
