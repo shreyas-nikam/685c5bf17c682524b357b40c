@@ -1,6 +1,8 @@
 # application_pages/page1.py
 import streamlit as st
 import pandas as pd
+import textwrap # Import textwrap
+
 from calculations import (
     calculate_fhc, calculate_fcr, calculate_fus, calculate_idiosyncratic_risk,
     calculate_h_base, calculate_systematic_risk,
@@ -14,8 +16,7 @@ from data_utils import (
     get_economic_climate_scenarios, get_ai_innovation_scenarios
 )
 from visualizations import plot_risk_factor_contributions
-from actuarial_params import * # Import all constants
-import textwrap
+from actuarial_params import * # Import all constants to get default values initially
 
 def run_page1():
     st.header("1. Risk Assessment")
@@ -40,6 +41,20 @@ def run_page1():
         if 'coverage_duration_months' not in st.session_state: st.session_state.coverage_duration_months = 6
         if 'target_occupation' not in st.session_state: st.session_state.target_occupation = None
         if 'months_elapsed_transition' not in st.session_state: st.session_state.months_elapsed_transition = 0
+
+        # Initialize actuarial parameters in session state using imported constants as defaults
+        if 'beta_systemic' not in st.session_state: st.session_state.beta_systemic = BETA_SYSTEMIC
+        if 'beta_individual' not in st.session_state: st.session_state.beta_individual = BETA_INDIVIDUAL
+        if 'loading_factor' not in st.session_state: st.session_state.loading_factor = LOADING_FACTOR
+        if 'min_premium' not in st.session_state: st.session_state.min_premium = MIN_PREMIUM
+        if 'ttv_period_months' not in st.session_state: st.session_state.ttv_period_months = TTV_PERIOD_MONTHS
+        if 'gamma_gen' not in st.session_state: st.session_state.gamma_gen = GAMMA_GEN
+        if 'gamma_spec' not in st.session_state: st.session_state.gamma_spec = GAMMA_SPEC
+        if 'w_cr_param' not in st.session_state: st.session_state.w_cr_param = W_CR
+        if 'w_us_param' not in st.session_state: st.session_state.w_us_param = W_US
+        if 'w_econ_param' not in st.session_state: st.session_state.w_econ_param = W_ECON
+        if 'w_inno_param' not in st.session_state: st.session_state.w_inno_param = W_INNO
+
 
     st.subheader("Your Profile Inputs")
     col1, col2 = st.columns(2)
@@ -139,50 +154,69 @@ def run_page1():
         )
         st.session_state.beta_systemic = st.slider(
             "Systemic Event Base Probability (β_systemic)",
-            min_value=0.01, max_value=0.50, value=BETA_SYSTEMIC, step=0.01,
+            min_value=0.01, max_value=0.50, value=st.session_state.beta_systemic, step=0.01,
             key='beta_systemic',
             help="Base probability of a systemic displacement event in your industry."
+        )
+        st.session_state.w_cr_param = st.slider(
+            "Weight for Company Risk Factor (w_CR)",
+            min_value=0.0, max_value=1.0, value=st.session_state.w_cr_param, step=0.05,
+            key='w_cr_param',
+            help="Weight for Company Risk Factor in Idiosyncratic Risk."
         )
     with col8:
         st.session_state.beta_individual = st.slider(
             "Individual Loss Base Probability (β_individual)",
-            min_value=0.10, max_value=1.00, value=BETA_INDIVIDUAL, step=0.01,
+            min_value=0.10, max_value=1.00, value=st.session_state.beta_individual, step=0.01,
             key='beta_individual',
             help="Base conditional probability of job loss for you, given a systemic event."
         )
         st.session_state.loading_factor = st.slider(
             "Loading Factor (λ)",
-            min_value=1.0, max_value=2.5, value=LOADING_FACTOR, step=0.1,
+            min_value=1.0, max_value=2.5, value=st.session_state.loading_factor, step=0.1,
             key='loading_factor',
             help="Standard insurance multiplier added to expected loss."
         )
         st.session_state.min_premium = st.number_input(
             "Minimum Premium ($)",
-            min_value=5.00, max_value=100.00, value=MIN_PREMIUM, step=5.00,
+            min_value=5.00, max_value=100.00, value=st.session_state.min_premium, step=5.00,
             key='min_premium',
             help="Minimum monthly premium to ensure policy viability."
         )
         st.session_state.ttv_period_months = st.slider(
             "Time-to-Value Period (TTV) for Transition (Months)",
-            min_value=1, max_value=36, value=TTV_PERIOD_MONTHS, step=1,
+            min_value=1, max_value=36, value=st.session_state.ttv_period_months, step=1,
             key='ttv_period_months',
             help="Total months for base hazard to transition to a new target occupation."
         )
         st.session_state.gamma_gen = st.slider(
             "Weight for General Skills (γ_gen)",
-            min_value=0.1, max_value=0.9, value=GAMMA_GEN, step=0.05,
+            min_value=0.1, max_value=0.9, value=st.session_state.gamma_gen, step=0.05,
             key='gamma_gen',
             help="Weight for general skills in Upskilling Factor. Should be > γ_spec."
         )
         st.session_state.gamma_spec = st.slider(
             "Weight for Firm-Specific Skills (γ_spec)",
-            min_value=0.0, max_value=0.5, value=GAMMA_SPEC, step=0.05,
+            min_value=0.0, max_value=0.5, value=st.session_state.gamma_spec, step=0.05,
             key='gamma_spec',
             help="Weight for firm-specific skills in Upskilling Factor. Should be < γ_gen."
         )
         if st.session_state.gamma_gen <= st.session_state.gamma_spec:
-            st.warning("Warning: γ_gen should be greater than γ_spec to properly reward portable skills.")
+            st.warning("Warning: γ_gen should be greater than γ_spec to properly reward portable skills. Auto-adjusting γ_gen.")
             st.session_state.gamma_gen = st.session_state.gamma_spec + 0.05 # Auto adjust
+        
+        st.session_state.w_us_param = 1.0 - st.session_state.w_cr_param # w_CR + w_US must sum to 1.0
+        st.write(f"Weight for Upskilling Factor (w_US): {st.session_state.w_us_param:.2f} (auto-adjusted)")
+        
+        # Systematic Risk Weights (w_econ, w_inno) should also sum to 1.0, as per spec
+        st.session_state.w_econ_param = st.slider(
+            "Weight for Economic Climate (w_econ)",
+            min_value=0.0, max_value=1.0, value=st.session_state.w_econ_param, step=0.05,
+            key='w_econ_param',
+            help="Weight for Economic Climate Modifier in Systematic Risk."
+        )
+        st.session_state.w_inno_param = 1.0 - st.session_state.w_econ_param
+        st.write(f"Weight for AI Innovation (w_inno): {st.session_state.w_inno_param:.2f} (auto-adjusted)")
 
 
     if st.button("Calculate AI-Q Score"):
@@ -201,6 +235,7 @@ def run_page1():
         st.session_state.fcr_score = fcr
 
         # Calculate FUS
+        # Use session state gamma values
         fus = calculate_fus(
             p_gen=st.session_state.general_skill_progress,
             p_spec=st.session_state.firm_specific_skill_progress
@@ -208,14 +243,22 @@ def run_page1():
         st.session_state.fus_score = fus
 
         # Calculate Idiosyncratic Risk V_i(t)
-        v_i_t = calculate_idiosyncratic_risk(fhc=fhc, fcr=fcr, fus=fus)
+        # Use session state W_CR and W_US
+        v_raw = fhc * (st.session_state.w_cr_param * fcr + st.session_state.w_us_param * fus)
+        v_i_t = min(100.0, max(5.0, v_raw * 50.0)) # Normalization constant 50.0 is implicit in problem statement
         st.session_state.idiosyncratic_risk_score = v_i_t
+        st.session_state.v_raw_score = v_raw # Store raw for explanation
 
         # Calculate H_base
-        h_base = calculate_h_base(current_occupation=st.session_state.current_occupation)
+        h_base = calculate_h_base(
+            current_occupation=st.session_state.current_occupation,
+            target_occupation=st.session_state.target_occupation, # Pass target_occupation for transition calculation
+            months_elapsed_transition=st.session_state.months_elapsed_transition
+        )
         st.session_state.h_base_score = h_base
 
         # Calculate Systematic Risk H_i
+        # Use session state W_ECON and W_INNO
         h_i = calculate_systematic_risk(
             h_base=h_base,
             economic_climate=st.session_state.economic_climate,
@@ -315,14 +358,14 @@ def run_page1():
             -   $FHC$: Human Capital Factor, assessing foundational resilience.
             -   $FCR$: Company Risk Factor, quantifying employer stability.
             -   $FUS$: Upskilling Factor, reflecting proactive training efforts.
-            -   $w_{{CR}}$: Weight for Company Risk Factor (e.g., {st.session_state.w_cr_param:.1f}).
-            -   $w_{{US}}$: Weight for Upskilling Factor (e.g., {st.session_state.w_us_param:.1f}).
+            -   $w_{{CR}}$: Weight for Company Risk Factor (current: {st.session_state.w_cr_param:.1f}).
+            -   $w_{{US}}$: Weight for Upskilling Factor (current: {st.session_state.w_us_param:.1f}).
 
             The final $V_{{i}}(t)$ is normalized to a scale of 0-100 using:
             $$
             V_{{i}}(t) = \min(100.0, \max(5.0, V_{{raw}} \cdot 50.0))
             $$
-            Your calculated $V_{{raw}}$ is: {st.session_state.fhc_score * (st.session_state.w_cr_param * st.session_state.fcr_score + st.session_state.w_us_param * st.session_state.fus_score):.2f}
+            Your calculated $V_{{raw}}$ is: {st.session_state.v_raw_score:.2f}
             """)
             st.markdown(md_content)
 
@@ -380,7 +423,7 @@ def run_page1():
             -   $H_{{base}}(t)$: Base Occupational Hazard for the occupation at time $t$.
             -   $M_{{econ}}$: Economic Climate Modifier (current: {ECONOMIC_CLIMATE_SCENARIOS.get(st.session_state.economic_climate, 1.0):.2f}), capturing macroeconomic environment's effect on AI investment.
             -   $I_{{AI}}$: AI Innovation Index (current: {AI_INNOVATION_SCENARIOS.get(st.session_state.ai_innovation_pace, 1.0):.2f}), capturing velocity of technological change.
-            -   $w_{{econ}}, w_{{inno}}$: Calibration weights that sum to 1.0 (e.g., 0.5 each).
+            -   $w_{{econ}}, w_{{inno}}$: Calibration weights that sum to 1.0 (current: {st.session_state.w_econ_param:.1f}, {st.session_state.w_inno_param:.1f}).
 
             Your calculated $H_{{base}}(t)$ is: {st.session_state.h_base_score:.2f}
             Your calculated $H_{{i}}$ is: {st.session_state.systematic_risk_score:.2f}
