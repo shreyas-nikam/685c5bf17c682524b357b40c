@@ -1,18 +1,15 @@
 
 # data/environmental_data.py
+# Synthetic data for environmental modifiers
 
 ECONOMIC_CLIMATE_SCENARIOS = {
     "Neutral": 1.0,
-    "Recession (Low Investment)": 0.9,
-    "Boom (High Investment)": 1.1,
-    "Stagnation": 0.95,
-    "Recovery": 1.05,
+    "Recession (Downturn)": 1.15, # Higher risk in recession
+    "Boom (Growth)": 0.85 # Lower risk in boom
 }
 
 AI_INNOVATION_SCENARIOS = {
     "Neutral": 1.0,
-    "Rapid Breakthroughs": 1.2,
-    "Slowdown in Innovation": 0.8,
-    "Emerging Adoption": 1.1,
-    "Widespread Integration": 1.15,
+    "Rapid Breakthroughs": 1.2, # Higher risk with rapid AI innovation
+    "Slowdown": 0.9 # Lower risk with AI innovation slowdown
 }
