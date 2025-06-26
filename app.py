@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 from calculations import (
@@ -33,7 +32,7 @@ st.sidebar.divider()
 st.title("AI Risk Score - V3")
 st.divider()
 
-st.markdown("""
+st.markdown(r"""
 ### Welcome to the Personalized Upskilling Recommender!
 
 In today's rapidly evolving job market, driven by advancements in Artificial Intelligence, understanding and mitigating your personal risk of job displacement is crucial. This application, "AI Risk Score - V3", empowers you to assess your vulnerability, identify skill gaps, and strategize your upskilling journey to enhance your career resilience.
@@ -147,13 +146,13 @@ $$
 Where:
 -   $P_{systemic}$: Probability of a systemic displacement event in the individual's industry.
     $$
-    P_{systemic} = \frac{H_{i}}{100} \cdot eta_{systemic}
+    P_{systemic} = \frac{H_{i}}{100} \cdot \beta_{systemic}
     $$
 -   $P_{individual|systemic}$: Conditional probability of job loss for the individual, given a systemic event.
     $$
-    P_{individual|systemic} = \frac{V_{i}(t)}{100} \cdot eta_{individual}
+    P_{individual|systemic} = \frac{V_{i}(t)}{100} \cdot \beta_{individual}
     $$
-Where $eta_{systemic}$ is the Systemic Event Base Probability and $eta_{individual}$ is the Individual Loss Base Probability.
+Where $\beta_{systemic}$ is the Systemic Event Base Probability and $\beta_{individual}$ is the Individual Loss Base Probability.
 
 ##### Expected Loss
 The Annual Expected Loss ($E[Loss]$) is the total payout amount multiplied by the probability of a claim.
@@ -191,20 +190,20 @@ with st.sidebar.expander("Actuarial & Payout Settings"):
     annual_salary = st.number_input("Annual Salary ($)", min_value=10000, max_value=500000, value=75000, step=5000)
     coverage_percentage = st.slider("Coverage Percentage (%)", min_value=0.0, max_value=1.0, value=0.6, step=0.05, format="%.2f")
     coverage_duration = st.number_input("Coverage Duration (Months)", min_value=1, max_value=24, value=6, step=1)
-    beta_systemic = st.slider("Systemic Event Base Probability (β_systemic)", min_value=0.01, max_value=0.5, value=BETA_SYSTEMIC, step=0.01)
-    beta_individual = st.slider("Individual Loss Base Probability (β_individual)", min_value=0.01, max_value=1.0, value=BETA_INDIVIDUAL, step=0.01)
+    beta_systemic = st.slider(r"Systemic Event Base Probability ($$ \beta_{systemic} $$)", min_value=0.01, max_value=0.5, value=BETA_SYSTEMIC, step=0.01)
+    beta_individual = st.slider(r"Individual Loss Base Probability ($$ \beta_{individual} $$)", min_value=0.01, max_value=1.0, value=BETA_INDIVIDUAL, step=0.01)
     loading_factor = st.slider("Loading Factor (λ)", min_value=1.0, max_value=3.0, value=LAMBDA, step=0.1)
-    minimum_premium = st.number_input("Minimum Premium (P_min) ($)", min_value=5.0, max_value=100.0, value=P_MIN, step=5.0)
+    minimum_premium = st.number_input(r"Minimum Premium ($$ {P_\text{min}} $$) ($)", min_value=5.0, max_value=100.0, value=P_MIN, step=5.0)
 
 with st.sidebar.expander("Model Weights & Time-to-Value"):
-    gamma_gen = st.slider("General Skill Weight (γ_gen)", min_value=0.1, max_value=0.9, value=GAMMA_GEN, step=0.05)
-    gamma_spec = st.slider("Firm-Specific Skill Weight (γ_spec)", min_value=0.1, max_value=0.9, value=GAMMA_SPEC, step=0.05)
+    gamma_gen = st.slider(r"General Skill Weight ($$ \gamma_{gen} $$)", min_value=0.1, max_value=0.9, value=GAMMA_GEN, step=0.05)
+    gamma_spec = st.slider(r"Firm-Specific Skill Weight ($$ \gamma_{_spec} $$)", min_value=0.1, max_value=0.9, value=GAMMA_SPEC, step=0.05)
     if gamma_gen <= gamma_spec:
-        st.warning("Warning: General Skill Weight (γ_gen) should ideally be greater than Firm-Specific Skill Weight (γ_spec).")
-    w_econ = st.slider("Economic Climate Weight (w_econ)", min_value=0.0, max_value=1.0, value=W_ECON, step=0.05)
-    w_inno = st.slider("AI Innovation Weight (w_inno)", min_value=0.0, max_value=1.0, value=W_INNO, step=0.05)
+        st.warning(r"Warning: General Skill Weight ($$ \gamma_{gen} $$) should ideally be greater than Firm-Specific Skill Weight ($$ \gamma_{_spec} $$).")
+    w_econ = st.slider(r"Economic Climate Weight ($$ w_{\text{econ}} $$)", min_value=0.0, max_value=1.0, value=W_ECON, step=0.05)
+    w_inno = st.slider(r"AI Innovation Weight ($$ w_{\text{inno}} $$)", min_value=0.0, max_value=1.0, value=W_INNO, step=0.05)
     if not (0.95 <= (w_econ + w_inno) <= 1.05):
-        st.warning("Warning: Economic and AI Innovation weights (w_econ + w_inno) should ideally sum close to 1.0.")
+        st.warning(r"Warning: Economic and AI Innovation weights ($$ w_{\text{econ}} $$ + $$ w_{\text{inno}} $$) should ideally sum close to 1.0.")
     ttv_months = st.slider("Time-to-Value Period (TTV) (Months)", min_value=3, max_value=36, value=TTV, step=1)
 
 
@@ -350,7 +349,6 @@ if page == "Risk Assessment":
             -   $f_{field}$: Education Field Factor (e.g., STEM fields have lower factor).
             -   $f_{school}$: Institution Tier Factor (e.g., Tier 1 schools have lower factor).
             -   $f_{exp}$: Experience Factor, which generally decreases with experience up to 20 years.
-            Current $FHC$: **{st.session_state['last_fhc']:.2f}**
             """)
 
         with st.expander("Company Risk Factor ($FCR$)"):
@@ -361,7 +359,6 @@ if page == "Risk Assessment":
             $$
             FCR = w_{1} \cdot S_{senti} + w_{2} \cdot S_{fin} + w_{3} \cdot S_{growth}
             $$
-            Current $FCR$: **{st.session_state['last_fcr']:.2f}** (from company type lookup)
             """)
 
         with st.expander("Upskilling Factor ($FUS$)"):
@@ -374,7 +371,6 @@ if page == "Risk Assessment":
             $$
             Where $P_{gen}(t)$ and $P_{spec}(t)$ are your progress (0-1) in general and firm-specific skills respectively.
             Note that $\gamma_{gen} > \gamma_{spec}$ ensures general skills have a stronger impact.
-            Current $FUS$: **{st.session_state['last_fus']:.2f}**
             """)
 
         with st.expander("Systematic Risk ($H_i$)"):
@@ -387,7 +383,6 @@ if page == "Risk Assessment":
             -   $H_{base}(t)$: Base Occupational Hazard for your role.
             -   $M_{econ}$: Economic Climate Modifier (e.g., recession increases risk).
             -   $I_{AI}$: AI Innovation Index (e.g., rapid breakthroughs increase risk).
-            Current $H_i$: **{st.session_state['last_calculated_h_systematic']:.2f}**
             """)
 
 elif page == "Upskilling Path":
@@ -427,9 +422,11 @@ elif page == "Upskilling Path":
         # For demonstration, let's assume recommended skills are 80% for general, 70% for firm-specific
         rec_prof_gen = 80
         rec_prof_spec = 70
+        Adaptability = 40  
         recommended_for_radar = {
             "General Skills": rec_prof_gen,
-            "Firm-Specific Skills": rec_prof_spec
+            "Firm-Specific Skills": rec_prof_spec,
+            "Adaptability": Adaptability
         }
         fig_radar = plot_skill_gap_radar(st.session_state['user_skills_proficiency'], recommended_for_radar)
         st.plotly_chart(fig_radar, use_container_width=True)
@@ -502,9 +499,11 @@ elif page == "Progress Tracking":
     st.subheader("Update Your Progress")
     col_update1, col_update2 = st.columns(2)
     with col_update1:
-        new_general_skill_progress = st.slider("Update General Skill Progress (0-100%)", min_value=0, max_value=100, value=st.session_state['skill_progress_history']['General Skill Progress'].iloc[-1] if not st.session_state['skill_progress_history'].empty else 50, step=5) / 100.0
+        last_gen_skill = int(st.session_state['skill_progress_history']['General Skill Progress'].iloc[-1]) if not st.session_state['skill_progress_history'].empty else 50
+        new_general_skill_progress = st.slider("Update General Skill Progress (0-100%)", min_value=0, max_value=100, value=last_gen_skill, step=5) / 100.0
     with col_update2:
-        new_firm_specific_skill_progress = st.slider("Update Firm-Specific Skill Progress (0-100%)", min_value=0, max_value=100, value=st.session_state['skill_progress_history']['Firm-Specific Skill Progress'].iloc[-1] if not st.session_state['skill_progress_history'].empty else 50, step=5) / 100.0
+        last_firm_skill = int(st.session_state['skill_progress_history']['Firm-Specific Skill Progress'].iloc[-1]) if not st.session_state['skill_progress_history'].empty else 50
+        new_firm_specific_skill_progress = st.slider("Update Firm-Specific Skill Progress (0-100%)", min_value=0, max_value=100, value=last_firm_skill, step=5) / 100.0
     
     # Placeholder for updating other factors if needed for historical tracking
     # e.g., simulating changes in years of experience, economic climate, etc.
