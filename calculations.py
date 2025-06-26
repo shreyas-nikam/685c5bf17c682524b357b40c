@@ -1,12 +1,11 @@
-
 # calculations.py
-import numpy as np
+# All AI-Q score and premium calculation functions
 
-# Import constants from actuarial_params
-from actuarial_params import (
-    W_CR, W_US, GAMMA_GEN, GAMMA_SPEC, W_ECON, W_INNO,
-    BETA_SYSTEMIC, BETA_INDIVIDUAL, LOADING_FACTOR, MIN_PREMIUM, TTV_MONTHS
-)
+import numpy as np
+from actuarial_params import *
+from data.occupation_data import ROLE_MULTIPLIERS, OCCUPATION_HAZARDS, COMPANY_TYPE_FACTORS
+from data.education_data import EDUCATION_LEVEL_FACTORS, EDUCATION_FIELD_FACTORS, SCHOOL_TIER_FACTORS
+from data.environmental_data import ECONOMIC_CLIMATE_SCENARIOS, AI_INNOVATION_SCENARIOS
 
 def calculate_fexp(years_experience: float) -> float:
     """
@@ -15,87 +14,118 @@ def calculate_fexp(years_experience: float) -> float:
     """
     return 1 - (0.015 * min(years_experience, 20))
 
-def calculate_fhc(f_role: float, f_level: float, f_field: float, f_school: float, f_exp: float) -> float:
+def calculate_fhc(
+    occupation: str,
+    years_experience: float,
+    education_level: str,
+    education_field: str,
+    school_tier: str
+) -> float:
     """
     Calculates the Human Capital Factor (FHC).
     Formula: FHC = f_role * f_level * f_field * f_school * f_exp
     """
-    return f_role * f_level * f_field * f_school * f_exp
+    f_role = ROLE_MULTIPLIERS.get(occupation, 1.0) # Default to 1.0 if not found
+    f_level = EDUCATION_LEVEL_FACTORS.get(education_level, 1.0)
+    f_field = EDUCATION_FIELD_FACTORS.get(education_field, 1.0)
+    f_school = SCHOOL_TIER_FACTORS.get(school_tier, 1.0)
+    f_exp = calculate_fexp(years_experience)
 
-def calculate_fcr(s_senti: float) -> float: # Simplified as per spec that FCR is a direct lookup
+    fhc_raw = f_role * f_level * f_field * f_school * f_exp
+    return fhc_raw
+
+def calculate_fcr(company_type: str) -> float:
     """
     Calculates the Company Risk Factor (FCR).
-    For synthetic data, this will be a direct lookup value.
-    The detailed formula FCR = w1 * S_senti + w2 * S_fin + w3 * S_growth is for conceptual understanding.
-    This function returns the pre-calculated FCR value.
+    Formula: FCR = w1 * S_senti + w2 * S_fin + w3 * S_growth
+    (Uses synthetic lookup based on company_type for S_senti, S_fin, S_growth)
     """
-    return s_senti # s_senti is effectively the pre-calculated FCR from lookup
+    factors = COMPANY_TYPE_FACTORS.get(company_type, {"sentiment": 1.0, "financial": 1.0, "growth": 1.0})
+    # As per prompt, interpret COMPANY_TYPE_FACTORS directly for FCR, where higher is riskier.
+    # The example values (0.95, 1.00, 1.10) for FCR in the spec (if they were FCR) match this.
+    # Since the internal factors (sentiment, financial, growth) are given, and no explicit weights,
+    # let's assume they contribute equally to a combined FCR for simplicity in this synthetic data context.
+    # Higher values in factors means higher risk.
+    return (factors["sentiment"] + factors["financial"] + factors["growth"]) / 3.0
 
-def calculate_fus(p_gen: float, p_spec: float, gamma_gen: float = GAMMA_GEN, gamma_spec: float = GAMMA_SPEC) -> float:
+def calculate_fus(p_gen: float, p_spec: float) -> float:
     """
     Calculates the Upskilling Factor (F_US).
-    Formula: F_US = 1 - (gamma_gen * p_gen + gamma_spec * p_spec)
-    p_gen and p_spec should be between 0 and 1 (representing 0-100% progress).
+    Formula: F_US = 1 - (gamma_gen * P_gen(t) + gamma_spec * P_spec(t))
+    p_gen and p_spec are 0-100%, convert to 0-1.
     """
-    return 1 - (gamma_gen * p_gen + gamma_spec * p_spec)
+    p_gen_norm = p_gen / 100.0
+    p_spec_norm = p_spec / 100.0
+    return 1 - (GAMMA_GEN * p_gen_norm + GAMMA_SPEC * p_spec_norm)
 
-def calculate_idiosyncratic_risk_raw(fhc: float, fcr: float, fus: float, w_cr: float = W_CR, w_us: float = W_US) -> float:
+def calculate_idiosyncratic_risk(fhc: float, fcr: float, fus: float) -> float:
     """
-    Calculates the raw Idiosyncratic Risk (V_raw).
+    Calculates the Idiosyncratic Risk (V_i(t)).
     Formula: V_raw = FHC * (w_CR * FCR + w_US * FUS)
+    Final V_i(t) = min(100.0, max(5.0, V_raw * 50.0))
     """
-    return fhc * (w_cr * fcr + w_us * fus)
+    v_raw = fhc * (W_CR * fcr + W_US * fus)
+    v_i_t = min(100.0, max(5.0, v_raw * 50.0))
+    return v_i_t
 
-def calculate_idiosyncratic_risk(v_raw: float) -> float:
+def calculate_h_base(
+    current_occupation: str,
+    target_occupation: str = None,
+    months_elapsed_transition: int = 0
+) -> float:
     """
-    Normalizes the raw Idiosyncratic Risk score.
-    Formula: V_i(t) = min(100.0, max(5.0, V_raw * 50.0))
+    Calculates the Base Occupational Hazard (H_base(t)).
+    If transitioning, H_base(k) = (1 - k/TTV) * H_current + (k/TTV) * H_target
     """
-    return min(100.0, max(5.0, v_raw * 50.0))
+    h_current = OCCUPATION_HAZARDS.get(current_occupation, 50) # Default to 50
+    if target_occupation and months_elapsed_transition > 0 and target_occupation in OCCUPATION_HAZARDS:
+        h_target = OCCUPATION_HAZARDS.get(target_occupation, h_current)
+        k = min(months_elapsed_transition, TTV_PERIOD_MONTHS) # Cap k at TTV_PERIOD_MONTHS
+        h_base_k = (1 - k / TTV_PERIOD_MONTHS) * h_current + (k / TTV_PERIOD_MONTHS) * h_target
+        return h_base_k
+    return h_current
 
-def calculate_h_base_transition(k: int, ttv: int, h_current: float, h_target: float) -> float:
+def calculate_systematic_risk(
+    h_base: float,
+    economic_climate: str,
+    ai_innovation_pace: str
+) -> float:
     """
-    Calculates the Base Occupational Hazard adjusted for career transitions (H_base(k)).
-    Formula: H_base(k) = (1 - k/TTV) * H_current + (k/TTV) * H_target
-    k: Number of months elapsed since transition pathway completion.
-    TTV: Total number of months in the Time-to-Value period.
-    """
-    if k >= ttv: # If months elapsed is equal or more than TTV, consider transition complete
-        return h_target
-    return (1 - k / ttv) * h_current + (k / ttv) * h_target
-
-def calculate_systematic_risk(h_base_t: float, m_econ: float, i_ai: float, w_econ: float = W_ECON, w_inno: float = W_INNO) -> float:
-    """
-    Calculates the Systematic Risk score (H_i).
+    Calculates the Systematic Risk (H_i).
     Formula: H_i = H_base(t) * (w_econ * M_econ + w_inno * I_AI)
     """
-    return h_base_t * (w_econ * m_econ + w_inno * i_ai)
+    m_econ = ECONOMIC_CLIMATE_SCENARIOS.get(economic_climate, 1.0)
+    i_ai = AI_INNOVATION_SCENARIOS.get(ai_innovation_pace, 1.0)
 
-def calculate_p_systemic(h_i: float, beta_systemic: float = BETA_SYSTEMIC) -> float:
-    """
-    Calculates the probability of a systemic displacement event (P_systemic).
-    Formula: P_systemic = H_i / 100 * beta_systemic
-    """
-    return (h_i / 100.0) * beta_systemic
+    h_i = h_base * (W_ECON * m_econ + W_INNO * i_ai)
+    return h_i
 
-def calculate_p_individual_given_systemic(v_i_t: float, beta_individual: float = BETA_INDIVIDUAL) -> float:
+def calculate_p_systemic(h_i: float) -> float:
     """
-    Calculates the conditional probability of job loss for the individual, given a systemic event (P_individual|systemic).
-    Formula: P_individual|systemic = V_i(t) / 100 * beta_individual
+    Calculates the Probability of a Systemic Displacement Event (P_systemic).
+    Formula: P_systemic = H_i / 100 * Beta_systemic
     """
-    return (v_i_t / 100.0) * beta_individual
+    return (h_i / 100.0) * BETA_SYSTEMIC
+
+def calculate_p_individual_given_systemic(v_i_t: float) -> float:
+    """
+    Calculates the Conditional Probability of Job Loss (P_individual|systemic).
+    Formula: P_individual|systemic = V_i(t) / 100 * Beta_individual
+    """
+    return (v_i_t / 100.0) * BETA_INDIVIDUAL
 
 def calculate_annual_claim_probability(p_systemic: float, p_individual_given_systemic: float) -> float:
     """
-    Calculates the annual probability of a claim (P_claim).
+    Calculates the Annual Claim Probability (P_claim).
     Formula: P_claim = P_systemic * P_individual|systemic
     """
     return p_systemic * p_individual_given_systemic
 
 def calculate_l_payout(annual_salary: float, coverage_duration_months: int, coverage_percentage: float) -> float:
     """
-    Calculates the total payout amount if a claim is triggered (L_payout).
-    Formula: L_payout = (Annual Salary / 12 * Coverage Duration) * Coverage Percentage
+    Calculates the Total Payout Amount if a claim is triggered (L_payout).
+    Formula: L_payout = (Annual Salary / 12 * Coverage Duration) * Coverage Percentage / 100
+    (Coverage Percentage is 0-100, convert to 0-1)
     """
     return (annual_salary / 12.0 * coverage_duration_months) * (coverage_percentage / 100.0)
 
@@ -106,9 +136,9 @@ def calculate_expected_loss(p_claim: float, l_payout: float) -> float:
     """
     return p_claim * l_payout
 
-def calculate_monthly_premium(e_loss: float, loading_factor: float = LOADING_FACTOR, min_premium: float = MIN_PREMIUM) -> float:
+def calculate_monthly_premium(e_loss: float) -> float:
     """
-    Calculates the monthly premium (P_monthly).
+    Calculates the Monthly Premium (P_monthly).
     Formula: P_monthly = max(E[Loss] * lambda / 12, P_min)
     """
-    return max((e_loss * loading_factor) / 12.0, min_premium)
+    return max((e_loss * LOADING_FACTOR) / 12.0, MIN_PREMIUM)
